@@ -1,0 +1,55 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+IMAGE_NAME="nerd-font-patcher"
+SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
+
+# Build the image if it doesn't exist
+if ! docker image inspect "$IMAGE_NAME" &>/dev/null; then
+  echo "Building ${IMAGE_NAME} Docker image..."
+  docker build -t "$IMAGE_NAME" "$SCRIPT_DIR"
+fi
+
+if [ $# -eq 0 ] || [[ "$1" == "--help" ]] || [[ "$1" == "-h" ]]; then
+  echo "Usage: $(basename "$0") <font-file> [patcher-options...]"
+  echo ""
+  echo "Converts a font file to a Nerd Font."
+  echo "Output is written to the same directory as the input font."
+  echo ""
+  echo "Examples:"
+  echo "  $(basename "$0") ~/Library/Fonts/MyFont.ttf --complete"
+  echo "  $(basename "$0") ./SomeFont.otf --complete --careful"
+  echo "  $(basename "$0") ./SomeFont.otf -c -s"
+  echo ""
+  echo "Common patcher options:"
+  echo "  -c, --complete     Patch with all Nerd Font glyphs"
+  echo "  -s, --mono         Make the font single-width (monospace)"
+  echo "  --careful          Don't overwrite existing glyphs"
+  echo "  -l, --adjust-line-height  Adjust line height"
+  echo ""
+  echo "Run with --help and no font file to see all patcher options:"
+  echo "  docker run --rm $IMAGE_NAME --help"
+  exit 0
+fi
+
+FONT_FILE="$1"
+shift
+
+if [ ! -f "$FONT_FILE" ]; then
+  echo "Error: Font file not found: $FONT_FILE"
+  exit 1
+fi
+
+FONT_DIR="$(cd "$(dirname "$FONT_FILE")" && pwd)"
+FONT_NAME="$(basename "$FONT_FILE")"
+
+echo "Patching ${FONT_NAME}..."
+
+docker run --rm \
+  -v "${FONT_DIR}:/fonts" \
+  "$IMAGE_NAME" \
+  "/fonts/${FONT_NAME}" \
+  --outputdir /fonts \
+  "$@"
+
+echo "Done! Patched font written to ${FONT_DIR}"
